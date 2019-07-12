@@ -1,19 +1,3 @@
-/*
-Copyright (c) 2018 Roger Light <roger@atchoo.org>
-
-All rights reserved. This program and the accompanying materials
-are made available under the terms of the Eclipse Public License v1.0
-and Eclipse Distribution License v1.0 which accompany this distribution.
-
-The Eclipse Public License is available at
-   http://www.eclipse.org/legal/epl-v10.html
-and the Eclipse Distribution License is available at
-  http://www.eclipse.org/org/documents/edl-v10.php.
-
-Contributors:
-   Roger Light - initial implementation and documentation.
-*/
-
 #include "config.h"
 
 #include <errno.h>
@@ -23,7 +7,7 @@ Contributors:
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
-#include "client_shared.h"
+#include "client_common.h"
 #include "mosquitto.h"
 #include "mqtt_protocol.h"
 
@@ -97,18 +81,18 @@ int cfg_parse_property(struct mosq_config *cfg, int argc, char *argv[], int *idx
 
   switch (cmd) {
     case CMD_CONNECT:
-      proplist = &cfg->connect_props;
+      proplist = &cfg->property_config->connect_props;
       break;
 
     case CMD_PUBLISH:
       if (identifier == MQTT_PROP_TOPIC_ALIAS) {
-        cfg->have_topic_alias = true;
+        cfg->pub_config->have_topic_alias = true;
       }
       if (identifier == MQTT_PROP_SUBSCRIPTION_IDENTIFIER) {
         fprintf(stderr, "Error: %s property not supported for %s in --property argument.\n\n", propname, cmdname);
         return MOSQ_ERR_INVAL;
       }
-      proplist = &cfg->publish_props;
+      proplist = &cfg->property_config->publish_props;
       break;
 
     case CMD_SUBSCRIBE:
@@ -116,15 +100,15 @@ int cfg_parse_property(struct mosq_config *cfg, int argc, char *argv[], int *idx
         fprintf(stderr, "Error: %s property not supported for %s in --property argument.\n\n", propname, cmdname);
         return MOSQ_ERR_NOT_SUPPORTED;
       }
-      proplist = &cfg->subscribe_props;
+      proplist = &cfg->property_config->subscribe_props;
       break;
 
     case CMD_UNSUBSCRIBE:
-      proplist = &cfg->unsubscribe_props;
+      proplist = &cfg->property_config->unsubscribe_props;
       break;
 
     case CMD_DISCONNECT:
-      proplist = &cfg->disconnect_props;
+      proplist = &cfg->property_config->disconnect_props;
       break;
 
     case CMD_AUTH:
@@ -132,7 +116,7 @@ int cfg_parse_property(struct mosq_config *cfg, int argc, char *argv[], int *idx
       return MOSQ_ERR_NOT_SUPPORTED;
 
     case CMD_WILL:
-      proplist = &cfg->will_props;
+      proplist = &cfg->property_config->will_props;
       break;
 
     case CMD_PUBACK:
