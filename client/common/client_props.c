@@ -33,7 +33,7 @@ enum prop_type {
  * connect user-property key value
  */
 
-int cfg_parse_property(struct mosq_config *cfg, int argc, char *argv[], int *idx) {
+int cfg_parse_property(mosq_config_t *cfg, int argc, char *argv[], int *idx) {
   char *cmdname = NULL, *propname = NULL;
   char *key = NULL, *value = NULL;
   int cmd, identifier, type;

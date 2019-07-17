@@ -133,7 +133,7 @@ typedef struct mosq_socks_config_s {
 } mosq_socks_config_t;
 #endif
 
-struct mosq_config {
+typedef struct mosq_config_s {
   mosq_general_config_t *general_config;
   mosq_pub_config_t *pub_config;
   mosq_sub_config_t *sub_config;
@@ -145,13 +145,13 @@ struct mosq_config {
 #ifdef WITH_SOCKS
   mosq_socks_config_t *socks_config;
 #endif
-};
+} mosq_config_t;
 
-void mosq_config_cleanup(struct mosq_config *cfg);
-void init_mosq_config(struct mosq_config *cfg, client_type_t client_type);
-int mosq_opts_set(struct mosquitto *mosq, struct mosq_config *cfg);
-int generate_client_id(struct mosq_config *cfg);
-int mosq_client_connect(struct mosquitto *mosq, struct mosq_config *cfg);
-int cfg_add_topic(struct mosq_config *cfg, client_type_t client_type, char *topic);
+void mosq_config_cleanup(mosq_config_t *cfg);
+void init_mosq_config(mosq_config_t *cfg, client_type_t client_type);
+int mosq_opts_set(struct mosquitto *mosq, mosq_config_t *cfg);
+int generate_client_id(mosq_config_t *cfg);
+int mosq_client_connect(struct mosquitto *mosq, mosq_config_t *cfg);
+int cfg_add_topic(mosq_config_t *cfg, client_type_t client_type, char *topic);
 
 #endif

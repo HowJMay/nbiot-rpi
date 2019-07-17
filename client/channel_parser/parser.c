@@ -3,9 +3,11 @@
 #include "client_common.h"
 #include "parser_utils.h"
 #include "pub_utils.h"
+#include "mosquitto_internal.h"
 
-struct mosq_config cfg;
-struct mosquitto *mosq = NULL;
+
+
+
 int mid_sent = 0;
 int status = STATUS_CONNECTING;
 bool process_messages = true;
@@ -13,7 +15,9 @@ int msg_count = 0;
 int last_mid = 0;
 
 int main(int argc, char *argv[]) {
+  mosq_config_t cfg;
   struct mosquitto *mosq = NULL;
+  //struct mosquitto *mosq = NULL;
   mosq_retcode_t ret;
 
   // Initialize `mosq` and `cfg`
@@ -43,6 +47,8 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Error: %s\n", mosquitto_strerror(ret));
     goto done;
   }
+
+  mosq->userdata = &cfg;
 
   // Start listening subscribing topics, once we received a message from the listening topics, we can send corresponding
   // message.

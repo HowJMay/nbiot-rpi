@@ -16,6 +16,8 @@ add_executable(pub_client pub_client/pub_client.c ${shared_src} ${pub_shared})
 target_link_libraries(sub_client mos_lib)
 target_link_libraries(pub_client mos_lib)
 
+#ADD_DEFINITIONS(-DWITH_TLS)
+
 include_directories(sub_client)
 include_directories(pub_client)
 add_executable(parser channel_parser/parser.c ${parser_shared} ${shared_src} ${pub_shared} ${sub_shared})

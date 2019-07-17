@@ -6,13 +6,22 @@
 #include "config.h"
 
 #ifdef WITH_SOCKS
-static int mosquitto__parse_socks_url(struct mosq_config *cfg, char *url);
+static int mosquitto__parse_socks_url(mosq_config_t *cfg, char *url);
 #endif
 
-void init_mosq_config(struct mosq_config *cfg, client_type_t client_type) {
-  memset(cfg, 0, sizeof(struct mosq_config));
+void init_mosq_config(mosq_config_t *cfg, client_type_t client_type) {
+  memset(cfg, 0, sizeof(mosq_config_t));
   cfg->general_config = (mosq_general_config_t *)malloc(sizeof(mosq_general_config_t));
   cfg->property_config = (mosq_property_config_t *)malloc(sizeof(mosq_property_config_t));
+  
+#ifdef WITH_TLS
+  cfg->tls_config = (mosq_tls_config_t *)malloc(sizeof(mosq_tls_config_t));
+#endif
+
+#ifdef WITH_SOCKS
+  cfg->socks_config = (mosq_socks_config_t *)malloc(sizeof(mosq_socks_config_t));
+#endif
+  
   if (client_type == client_pub || client_type == client_duplex) {
     cfg->pub_config = (mosq_pub_config_t *)malloc(sizeof(mosq_pub_config_t));
     cfg->pub_config->repeat_count = 1;
@@ -32,7 +41,7 @@ void init_mosq_config(struct mosq_config *cfg, client_type_t client_type) {
   cfg->general_config->client_type = client_type;
 }
 
-void mosq_config_cleanup(struct mosq_config *cfg) {
+void mosq_config_cleanup(mosq_config_t *cfg) {
   if (cfg->general_config->client_type == client_pub || cfg->general_config->client_type == client_duplex) {
     free(cfg->pub_config->file_input);
     free(cfg->pub_config->message);
@@ -99,7 +108,7 @@ void mosq_config_cleanup(struct mosq_config *cfg) {
   mosquitto_property_free_all(&cfg->property_config->will_props);
 }
 
-int cfg_add_topic(struct mosq_config *cfg, client_type_t client_type, char *topic) {
+int cfg_add_topic(mosq_config_t *cfg, client_type_t client_type, char *topic) {
   if (mosquitto_validate_utf8(topic, strlen(topic))) {
     fprintf(stderr, "Error: Malformed UTF-8 in topic argument.\n\n");
     return EXIT_FAILURE;
@@ -132,7 +141,7 @@ int cfg_add_topic(struct mosq_config *cfg, client_type_t client_type, char *topi
   return 0;
 }
 
-int mosq_opts_set(struct mosquitto *mosq, struct mosq_config *cfg) {
+int mosq_opts_set(struct mosquitto *mosq, mosq_config_t *cfg) {
 #if defined(WITH_TLS) || defined(WITH_SOCKS)
   int ret;
 #endif
@@ -228,7 +237,7 @@ int mosq_opts_set(struct mosquitto *mosq, struct mosq_config *cfg) {
   return MOSQ_ERR_SUCCESS;
 }
 
-int generate_client_id(struct mosq_config *cfg) {
+int generate_client_id(mosq_config_t *cfg) {
   if (cfg->general_config->id_prefix) {
     cfg->general_config->id = malloc(strlen(cfg->general_config->id_prefix) + 10);
     if (!cfg->general_config->id) {
@@ -242,7 +251,7 @@ int generate_client_id(struct mosq_config *cfg) {
   return MOSQ_ERR_SUCCESS;
 }
 
-int mosq_client_connect(struct mosquitto *mosq, struct mosq_config *cfg) {
+int mosq_client_connect(struct mosquitto *mosq, mosq_config_t *cfg) {
   char *err;
   int ret;
   int port;
@@ -335,7 +344,7 @@ static int mosquitto__urldecode(char *str) {
   return 0;
 }
 
-static int mosquitto__parse_socks_url(struct mosq_config *cfg, char *url) {
+static int mosquitto__parse_socks_url(mosq_config_t *cfg, char *url) {
   char *str;
   size_t i;
   char *username = NULL, *password = NULL, *host = NULL, *port = NULL;

@@ -17,8 +17,8 @@ void subscribe_callback_parser_func(struct mosquitto *mosq, void *obj, int mid, 
 void disconnect_callback_parser_func(struct mosquitto *mosq, void *obj, mosq_retcode_t ret,
                                      const mosquitto_property *properties);
 void log_callback_parser_func(struct mosquitto *mosq, void *obj, int level, const char *str);
-rc_mosq_retcode_t parser_config_init(struct mosquitto **config_mosq, struct mosq_config *config_cfg);
-rc_mosq_retcode_t gossip_channel_setting(struct mosq_config *channel_cfg, char *host, char *sub_topic, char *pub_topic);
-rc_mosq_retcode_t gossip_message_set(struct mosq_config *channel_cfg, char *message);
-rc_mosq_retcode_t parser_loop(struct mosquitto *loop_mosq, struct mosq_config *loop_cfg);
+rc_mosq_retcode_t parser_config_init(struct mosquitto **config_mosq, mosq_config_t *config_cfg);
+rc_mosq_retcode_t gossip_channel_setting(mosq_config_t *channel_cfg, char *host, char *sub_topic, char *pub_topic);
+rc_mosq_retcode_t gossip_message_set(mosq_config_t *channel_cfg, char *message);
+rc_mosq_retcode_t parser_loop(struct mosquitto *loop_mosq, mosq_config_t *loop_cfg);
 #endif

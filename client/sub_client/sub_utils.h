@@ -6,7 +6,7 @@
 #include "client_common.h"
 #include "sub_utils.h"
 
-extern struct mosq_config cfg;
+extern mosq_config_t cfg;
 extern bool process_messages;
 extern int msg_count;
 extern struct mosquitto *mosq;

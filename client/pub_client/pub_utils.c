@@ -15,10 +15,10 @@ int publish_count = 0;
 bool ready_for_repeat = false;
 struct timeval next_publish_tv;
 
-static void set_repeat_time(void) {
+static void set_repeat_time(mosq_config_t *cfg) {
   gettimeofday(&next_publish_tv, NULL);
-  next_publish_tv.tv_sec += cfg.pub_config->repeat_delay.tv_sec;
-  next_publish_tv.tv_usec += cfg.pub_config->repeat_delay.tv_usec;
+  next_publish_tv.tv_sec += cfg->pub_config->repeat_delay.tv_sec;
+  next_publish_tv.tv_usec += cfg->pub_config->repeat_delay.tv_usec;
 
   next_publish_tv.tv_sec += next_publish_tv.tv_usec / 1e6;
   next_publish_tv.tv_usec = next_publish_tv.tv_usec % 1000000;
@@ -37,21 +37,20 @@ static int check_repeat_time(void) {
   return 0;
 }
 
-int publish_message(struct mosquitto *mosq, int *mid, const char *topic, int payloadlen, void *payload, int qos,
+int publish_message(struct mosquitto *mosq, mosq_config_t *cfg, int *mid, const char *topic, int payloadlen, void *payload, int qos,
                     bool retain) {
   ready_for_repeat = false;
-  if (cfg.general_config->protocol_version == MQTT_PROTOCOL_V5 && cfg.pub_config->have_topic_alias &&
+  if (cfg->general_config->protocol_version == MQTT_PROTOCOL_V5 && cfg->pub_config->have_topic_alias &&
       first_publish == false) {
-    return mosquitto_publish_v5(mosq, mid, NULL, payloadlen, payload, qos, retain, cfg.property_config->publish_props);
+    return mosquitto_publish_v5(mosq, mid, NULL, payloadlen, payload, qos, retain, cfg->property_config->publish_props);
   } else {
     first_publish = false;
-    return mosquitto_publish_v5(mosq, mid, topic, payloadlen, payload, qos, retain, cfg.property_config->publish_props);
+    return mosquitto_publish_v5(mosq, mid, topic, payloadlen, payload, qos, retain, cfg->property_config->publish_props);
   }
 }
 
 void log_callback_pub_func(struct mosquitto *mosq, void *obj, int level, const char *str) {
-  UNUSED(mosq);
-  UNUSED(obj);
+  
   UNUSED(level);
 
   printf("log: [%s]\n", str);
@@ -59,8 +58,8 @@ void log_callback_pub_func(struct mosquitto *mosq, void *obj, int level, const c
 
 void disconnect_callback_pub_func(struct mosquitto *mosq, void *obj, mosq_retcode_t ret,
                                   const mosquitto_property *properties) {
-  UNUSED(mosq);
-  UNUSED(obj);
+  
+  
   UNUSED(ret);
   UNUSED(properties);
 
@@ -71,29 +70,28 @@ void disconnect_callback_pub_func(struct mosquitto *mosq, void *obj, mosq_retcod
 void connect_callback_pub_func(struct mosquitto *mosq, void *obj, int result, int flags,
                                const mosquitto_property *properties) {
   mosq_retcode_t ret = MOSQ_ERR_SUCCESS;
-
-  UNUSED(obj);
+  mosq_config_t *cfg = (mosq_config_t *)obj;
   UNUSED(flags);
   UNUSED(properties);
 
   if (!result) {
-    switch (cfg.pub_config->pub_mode) {
+    switch (cfg->pub_config->pub_mode) {
       case MSGMODE_CMD:
       case MSGMODE_FILE:
       case MSGMODE_STDIN_FILE:
-        ret = publish_message(mosq, &mid_sent, cfg.pub_config->topic, cfg.pub_config->msglen, cfg.pub_config->message,
-                              cfg.general_config->qos, cfg.general_config->retain);
+        ret = publish_message(mosq, cfg, &mid_sent, cfg->pub_config->topic, cfg->pub_config->msglen, cfg->pub_config->message,
+                              cfg->general_config->qos, cfg->general_config->retain);
         break;
       case MSGMODE_NULL:
-        ret = publish_message(mosq, &mid_sent, cfg.pub_config->topic, 0, NULL, cfg.general_config->qos,
-                              cfg.general_config->retain);
+        ret = publish_message(mosq, cfg, &mid_sent, cfg->pub_config->topic, 0, NULL, cfg->general_config->qos,
+                              cfg->general_config->retain);
         break;
       case MSGMODE_STDIN_LINE:
         status = STATUS_CONNACK_RECVD;
         break;
     }
     if (ret) {
-      if (!cfg.general_config->quiet) {
+      if (!cfg->general_config->quiet) {
         switch (ret) {
           case MOSQ_ERR_INVAL:
             fprintf(stderr, "Error: Invalid input. Does your topic contain '+' or '#'?\n");
@@ -115,11 +113,11 @@ void connect_callback_pub_func(struct mosquitto *mosq, void *obj, int result, in
             break;
         }
       }
-      mosquitto_disconnect_v5(mosq, 0, cfg.property_config->disconnect_props);
+      mosquitto_disconnect_v5(mosq, 0, cfg->property_config->disconnect_props);
     }
   } else {
-    if (result && !cfg.general_config->quiet) {
-      if (cfg.general_config->protocol_version == MQTT_PROTOCOL_V5) {
+    if (result && !cfg->general_config->quiet) {
+      if (cfg->general_config->protocol_version == MQTT_PROTOCOL_V5) {
         fprintf(stderr, "%s\n", mosquitto_reason_string(result));
       } else {
         fprintf(stderr, "%s\n", mosquitto_connack_string(result));
@@ -131,27 +129,27 @@ void connect_callback_pub_func(struct mosquitto *mosq, void *obj, int result, in
 
 void publish_callback_pub_func(struct mosquitto *mosq, void *obj, int mid, int reason_code,
                                const mosquitto_property *properties) {
-  UNUSED(obj);
+  mosq_config_t *cfg = (mosq_config_t *)obj;
   UNUSED(properties);
 
   last_mid_sent = mid;
   if (reason_code > 127) {
-    if (!cfg.general_config->quiet) {
+    if (!cfg->general_config->quiet) {
       fprintf(stderr, "Warning: Publish %d failed: %s.\n", mid, mosquitto_reason_string(reason_code));
     }
   }
   publish_count++;
 
-  if (cfg.pub_config->pub_mode == MSGMODE_STDIN_LINE) {
+  if (cfg->pub_config->pub_mode == MSGMODE_STDIN_LINE) {
     if (mid == last_mid) {
-      mosquitto_disconnect_v5(mosq, 0, cfg.property_config->disconnect_props);
+      mosquitto_disconnect_v5(mosq, 0, cfg->property_config->disconnect_props);
       disconnect_sent = true;
     }
-  } else if (publish_count < cfg.pub_config->repeat_count) {
+  } else if (publish_count < cfg->pub_config->repeat_count) {
     ready_for_repeat = true;
-    set_repeat_time();
+    set_repeat_time(cfg);
   } else if (disconnect_sent == false) {
-    mosquitto_disconnect_v5(mosq, 0, cfg.property_config->disconnect_props);
+    mosquitto_disconnect_v5(mosq, 0, cfg->property_config->disconnect_props);
     disconnect_sent = true;
   }
 
@@ -167,7 +165,7 @@ int pub_shared_init(void) {
   return 0;
 }
 
-int publish_loop(struct mosquitto *mosq) {
+int publish_loop(struct mosquitto *mosq, mosq_config_t *cfg) {
   int read_len;
   int pos;
   mosq_retcode_t ret, ret2;
@@ -176,12 +174,12 @@ int publish_loop(struct mosquitto *mosq) {
   int mode;
   int loop_delay = 1000;
 
-  if (cfg.pub_config->repeat_count > 1 &&
-      (cfg.pub_config->repeat_delay.tv_sec == 0 || cfg.pub_config->repeat_delay.tv_usec != 0)) {
-    loop_delay = cfg.pub_config->repeat_delay.tv_usec / 2000;
+  if (cfg->pub_config->repeat_count > 1 &&
+      (cfg->pub_config->repeat_delay.tv_sec == 0 || cfg->pub_config->repeat_delay.tv_usec != 0)) {
+    loop_delay = cfg->pub_config->repeat_delay.tv_usec / 2000;
   }
 
-  mode = cfg.pub_config->pub_mode;
+  mode = cfg->pub_config->pub_mode;
 
   if (mode == MSGMODE_STDIN_LINE) {
     mosquitto_loop_start(mosq);
@@ -196,11 +194,11 @@ int publish_loop(struct mosquitto *mosq) {
           buf_len_actual = strlen(line_buf);
           if (line_buf[buf_len_actual - 1] == '\n') {
             line_buf[buf_len_actual - 1] = '\0';
-            ret2 = publish_message(mosq, &mid_sent, cfg.pub_config->topic, buf_len_actual - 1, line_buf,
-                                   cfg.general_config->qos, cfg.general_config->retain);
+            ret2 = publish_message(mosq, cfg, &mid_sent, cfg->pub_config->topic, buf_len_actual - 1, line_buf,
+                                   cfg->general_config->qos, cfg->general_config->retain);
             if (ret2) {
-              if (!cfg.general_config->quiet) fprintf(stderr, "Error: Publish returned %d, disconnecting.\n", ret2);
-              mosquitto_disconnect_v5(mosq, MQTT_RC_DISCONNECT_WITH_WILL_MSG, cfg.property_config->disconnect_props);
+              if (!cfg->general_config->quiet) fprintf(stderr, "Error: Publish returned %d, disconnecting.\n", ret2);
+              mosquitto_disconnect_v5(mosq, MQTT_RC_DISCONNECT_WITH_WILL_MSG, cfg->property_config->disconnect_props);
             }
             break;
           } else {
@@ -218,7 +216,7 @@ int publish_loop(struct mosquitto *mosq) {
         if (feof(stdin)) {
           if (mid_sent == -1) {
             /* Empty file */
-            mosquitto_disconnect_v5(mosq, 0, cfg.property_config->disconnect_props);
+            mosquitto_disconnect_v5(mosq, 0, cfg->property_config->disconnect_props);
             disconnect_sent = true;
             status = STATUS_DISCONNECTING;
           } else {
@@ -228,7 +226,7 @@ int publish_loop(struct mosquitto *mosq) {
         }
       } else if (status == STATUS_WAITING) {
         if (last_mid_sent == last_mid && disconnect_sent == false) {
-          mosquitto_disconnect_v5(mosq, 0, cfg.property_config->disconnect_props);
+          mosquitto_disconnect_v5(mosq, 0, cfg->property_config->disconnect_props);
           disconnect_sent = true;
         }
         struct timespec ts;
@@ -241,17 +239,16 @@ int publish_loop(struct mosquitto *mosq) {
       ret = mosquitto_loop(mosq, loop_delay, 1);
       if (ready_for_repeat && check_repeat_time()) {
         ret = 0;
-        switch (cfg.pub_config->pub_mode) {
+        switch (cfg->pub_config->pub_mode) {
           case MSGMODE_CMD:
           case MSGMODE_FILE:
           case MSGMODE_STDIN_FILE:
-            printf("loop \n");
-            ret = publish_message(mosq, &mid_sent, cfg.pub_config->topic, cfg.pub_config->msglen,
-                                  cfg.pub_config->message, cfg.general_config->qos, cfg.general_config->retain);
+            ret = publish_message(mosq, cfg, &mid_sent, cfg->pub_config->topic, cfg->pub_config->msglen,
+                                  cfg->pub_config->message, cfg->general_config->qos, cfg->general_config->retain);
             break;
           case MSGMODE_NULL:
-            ret = publish_message(mosq, &mid_sent, cfg.pub_config->topic, 0, NULL, cfg.general_config->qos,
-                                  cfg.general_config->retain);
+            ret = publish_message(mosq, cfg, &mid_sent, cfg->pub_config->topic, 0, NULL, cfg->general_config->qos,
+                                  cfg->general_config->retain);
             break;
           case MSGMODE_STDIN_LINE:
             break;
@@ -269,7 +266,7 @@ int publish_loop(struct mosquitto *mosq) {
   return 0;
 }
 
-mosq_retcode_t init_check_error(struct mosq_config *cfg, client_type_t client_type) {
+mosq_retcode_t init_check_error(mosq_config_t *cfg, client_type_t client_type) {
   rc_mosq_retcode_t ret = RC_MOS_OK;
 
   if (cfg->general_config->will_payload && !cfg->general_config->will_topic) {

@@ -73,7 +73,7 @@ static void json_print(const struct mosquitto_message *message, const struct tm 
   }
 }
 
-static void formatted_print(const struct mosq_config *cfg, const struct mosquitto_message *message) {
+static void formatted_print(const mosq_config_t *cfg, const struct mosquitto_message *message) {
   int len;
   int i;
   struct tm *ti = NULL;
@@ -246,7 +246,7 @@ static void formatted_print(const struct mosq_config *cfg, const struct mosquitt
   fflush(stdout);
 }
 
-void print_message(struct mosq_config *cfg, const struct mosquitto_message *message) {
+void print_message(mosq_config_t *cfg, const struct mosquitto_message *message) {
   if (cfg->sub_config->format) {
     formatted_print(cfg, message);
   } else if (cfg->sub_config->verbose) {
@@ -276,18 +276,20 @@ void print_message(struct mosq_config *cfg, const struct mosquitto_message *mess
 void signal_handler_func(int signum) {
   if (signum == SIGALRM) {
     process_messages = false;
-    mosquitto_disconnect_v5(mosq, MQTT_RC_DISCONNECT_WITH_WILL_MSG, cfg.property_config->disconnect_props);
+    // TODO: Find some way else to break a loop or disconnect the client, in which way we don't 
+    // need to use variable `mosq`, `cfg`
+    //mosquitto_disconnect_v5(mosq, MQTT_RC_DISCONNECT_WITH_WILL_MSG, cfg.property_config->disconnect_props);
   }
 }
 
 void publish_callback_sub_func(struct mosquitto *mosq, void *obj, int mid, int reason_code,
                                const mosquitto_property *properties) {
-  UNUSED(obj);
+  mosq_config_t *cfg = (mosq_config_t *)obj;
   UNUSED(reason_code);
   UNUSED(properties);
 
   if (process_messages == false && (mid == last_mid || last_mid == 0)) {
-    mosquitto_disconnect_v5(mosq, 0, cfg.property_config->disconnect_props);
+    mosquitto_disconnect_v5(mosq, 0, cfg->property_config->disconnect_props);
   }
 
   printf("publish_callback_sub_func \n");
@@ -297,40 +299,40 @@ void message_callback_sub_func(struct mosquitto *mosq, void *obj, const struct m
                                const mosquitto_property *properties) {
   int i;
   bool res;
+  mosq_config_t *cfg = (mosq_config_t *)obj;
 
-  UNUSED(obj);
   UNUSED(properties);
 
   if (process_messages == false) return;
 
-  if (cfg.sub_config->remove_retained && message->retain) {
+  if (cfg->sub_config->remove_retained && message->retain) {
     mosquitto_publish(mosq, &last_mid, message->topic, 0, NULL, 1, true);
   }
 
-  if (cfg.sub_config->retained_only && !message->retain && process_messages) {
+  if (cfg->sub_config->retained_only && !message->retain && process_messages) {
     process_messages = false;
     if (last_mid == 0) {
-      mosquitto_disconnect_v5(mosq, 0, cfg.property_config->disconnect_props);
+      mosquitto_disconnect_v5(mosq, 0, cfg->property_config->disconnect_props);
     }
     return;
   }
 
-  if (message->retain && cfg.sub_config->no_retain) return;
-  if (cfg.sub_config->filter_outs) {
-    for (i = 0; i < cfg.sub_config->filter_out_count; i++) {
-      mosquitto_topic_matches_sub(cfg.sub_config->filter_outs[i], message->topic, &res);
+  if (message->retain && cfg->sub_config->no_retain) return;
+  if (cfg->sub_config->filter_outs) {
+    for (i = 0; i < cfg->sub_config->filter_out_count; i++) {
+      mosquitto_topic_matches_sub(cfg->sub_config->filter_outs[i], message->topic, &res);
       if (res) return;
     }
   }
 
-  print_message(&cfg, message);
+  print_message(cfg, message);
 
-  if (cfg.sub_config->msg_count > 0) {
+  if (cfg->sub_config->msg_count > 0) {
     msg_count++;
-    if (cfg.sub_config->msg_count == msg_count) {
+    if (cfg->sub_config->msg_count == msg_count) {
       process_messages = false;
       if (last_mid == 0) {
-        mosquitto_disconnect_v5(mosq, 0, cfg.property_config->disconnect_props);
+        mosquitto_disconnect_v5(mosq, 0, cfg->property_config->disconnect_props);
       }
     }
   }
@@ -341,28 +343,28 @@ void message_callback_sub_func(struct mosquitto *mosq, void *obj, const struct m
 void connect_callback_sub_func(struct mosquitto *mosq, void *obj, int result, int flags,
                                const mosquitto_property *properties) {
   int i;
+  mosq_config_t *cfg = (mosq_config_t *)obj;
 
-  UNUSED(obj);
   UNUSED(flags);
   UNUSED(properties);
 
   if (!result) {
-    mosquitto_subscribe_multiple(mosq, NULL, cfg.sub_config->topic_count, cfg.sub_config->topics,
-                                 cfg.general_config->qos, cfg.sub_config->sub_opts,
-                                 cfg.property_config->subscribe_props);
+    mosquitto_subscribe_multiple(mosq, NULL, cfg->sub_config->topic_count, cfg->sub_config->topics,
+                                 cfg->general_config->qos, cfg->sub_config->sub_opts,
+                                 cfg->property_config->subscribe_props);
 
-    for (i = 0; i < cfg.sub_config->unsub_topic_count; i++) {
-      mosquitto_unsubscribe_v5(mosq, NULL, cfg.sub_config->unsub_topics[i], cfg.property_config->unsubscribe_props);
+    for (i = 0; i < cfg->sub_config->unsub_topic_count; i++) {
+      mosquitto_unsubscribe_v5(mosq, NULL, cfg->sub_config->unsub_topics[i], cfg->property_config->unsubscribe_props);
     }
   } else {
-    if (result && !cfg.general_config->quiet) {
-      if (cfg.general_config->protocol_version == MQTT_PROTOCOL_V5) {
+    if (result && !cfg->general_config->quiet) {
+      if (cfg->general_config->protocol_version == MQTT_PROTOCOL_V5) {
         fprintf(stderr, "%s\n", mosquitto_reason_string(result));
       } else {
         fprintf(stderr, "%s\n", mosquitto_connack_string(result));
       }
     }
-    mosquitto_disconnect_v5(mosq, 0, cfg.property_config->disconnect_props);
+    mosquitto_disconnect_v5(mosq, 0, cfg->property_config->disconnect_props);
   }
 
   printf("connect_callback_sub_func \n");
@@ -371,16 +373,16 @@ void connect_callback_sub_func(struct mosquitto *mosq, void *obj, int result, in
 void subscribe_callback_sub_func(struct mosquitto *mosq, void *obj, int mid, int qos_count, const int *granted_qos) {
   int i;
 
-  UNUSED(obj);
+  mosq_config_t *cfg = (mosq_config_t *)obj;
 
-  if (!cfg.general_config->quiet) printf("Subscribed (mid: %d): %d", mid, granted_qos[0]);
+  if (!cfg->general_config->quiet) printf("Subscribed (mid: %d): %d", mid, granted_qos[0]);
   for (i = 1; i < qos_count; i++) {
-    if (!cfg.general_config->quiet) printf(", %d", granted_qos[i]);
+    if (!cfg->general_config->quiet) printf(", %d", granted_qos[i]);
   }
-  if (!cfg.general_config->quiet) printf("\n");
+  if (!cfg->general_config->quiet) printf("\n");
 
-  if (cfg.sub_config->exit_after_sub) {
-    mosquitto_disconnect_v5(mosq, 0, cfg.property_config->disconnect_props);
+  if (cfg->sub_config->exit_after_sub) {
+    mosquitto_disconnect_v5(mosq, 0, cfg->property_config->disconnect_props);
   }
 
   printf("subscribe_callback_sub_func \n");
@@ -388,7 +390,7 @@ void subscribe_callback_sub_func(struct mosquitto *mosq, void *obj, int mid, int
 
 void log_callback_sub_func(struct mosquitto *mosq, void *obj, int level, const char *str) {
   UNUSED(mosq);
-  UNUSED(obj);
+  
   UNUSED(level);
 
   printf("%s\n", str);

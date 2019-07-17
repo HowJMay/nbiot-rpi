@@ -3,11 +3,12 @@
 #include <string.h>
 #include "client_common.h"
 #include "pub_utils.h"
+#include "mosquitto_internal.h"
 
 int last_mid = -1;
 int mid_sent;
 int status;
-struct mosq_config cfg;
+mosq_config_t cfg;
 
 int main(int argc, char *argv[]) {
   struct mosquitto *mosq = NULL;
@@ -55,7 +56,7 @@ int main(int argc, char *argv[]) {
   if (mosq_opts_set(mosq, &cfg)) {
     goto cleanup;
   }
-
+  mosq->userdata = &cfg;
   if (cfg.general_config->debug) {
     mosquitto_log_callback_set(mosq, log_callback_pub_func);
   }
@@ -68,7 +69,7 @@ int main(int argc, char *argv[]) {
     goto cleanup;
   }
 
-  ret = publish_loop(mosq);
+  ret = publish_loop(mosq, &cfg);
 
   if (cfg.pub_config->message && cfg.pub_config->pub_mode == MSGMODE_FILE) {
     free(cfg.pub_config->message);

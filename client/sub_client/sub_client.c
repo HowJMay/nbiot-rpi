@@ -9,7 +9,7 @@
 #include "client_common.h"
 #include "sub_utils.h"
 
-struct mosq_config cfg;
+mosq_config_t cfg;
 bool process_messages = true;
 int msg_count = 0;
 struct mosquitto *mosq = NULL;
